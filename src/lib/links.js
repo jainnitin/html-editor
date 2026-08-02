@@ -8,6 +8,7 @@
 
 import { $, doc, win, toast, escapeHtml } from './dom.js';
 import { S, markDirty } from './state.js';
+import { track, bucket } from './telemetry.js';
 
 const linkDlg = $('linkdlg');
 const auditDlg = $('auditdlg');
@@ -91,6 +92,7 @@ function applyLink() {
   }
 
   markDirty();
+  track('link_edited', { action: currentLink ? 'updated' : 'created' });
   linkDlg.close();
 }
 
@@ -151,6 +153,10 @@ export function showAudit() {
     });
   }
 
+  track('link_audit', {
+    total: bucket(anchors.length),
+    broken: bucket(count('dead') + count('empty'))
+  });
   auditDlg.showModal();
 }
 

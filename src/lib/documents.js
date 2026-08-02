@@ -15,6 +15,7 @@ import { resetMode } from './modes.js';
 import { closeFind } from './find.js';
 import { serialize } from './viewport.js';
 import { clearUndo } from './history.js';
+import { track, trackError, bucket, shutdown } from './telemetry.js';
 
 const AUTOSAVE_DELAY = 1200;
 
@@ -62,6 +63,11 @@ function applyDocument(path, html) {
   setTitle();
   setSaveState();
   invoke('push_recent', { path }).catch(() => {});
+
+  track('file_opened', {
+    size: bucket(html.length),
+    has_scripts: String(/<script[\s>]/i.test(html))
+  });
 }
 
 /* ---------------- saving ---------------- */
@@ -96,8 +102,10 @@ export async function doSave(auto) {
     markClean();
     if (madeBackup) toast(`Original kept as ${baseName(S.filePath)}.bak`, 2600);
     else if (!auto) toast('Saved ✓');
+    track('file_saved', { trigger: auto ? 'auto' : 'manual' });
   } catch (e) {
     setSaveState();
+    trackError('save_failed', 'write_text_file rejected');
     await fail('Could not write the file.', e);
   } finally {
     S.saving = false;
@@ -147,6 +155,7 @@ export async function setAutosave(on) {
   else clearTimeout(saveTimer);
   setTitle();
   setSaveState();
+  track('autosave_toggled', { state: on ? 'on' : 'off' });
   toast(
     on ? 'Auto-save on — writes shortly after you stop typing.' : 'Auto-save off — ⌘S to save.',
     2600
@@ -164,7 +173,9 @@ export async function openInBrowser() {
   if (S.dirty) await (S.autosave ? flushSave() : doSave(true));
   try {
     await invoke('open_in_browser', { path: S.filePath });
+    track('browser_preview');
   } catch (e) {
+    trackError('browser_preview_failed', 'open_in_browser rejected');
     await fail('Could not open the file in a browser.', e);
   }
 }
@@ -196,17 +207,13 @@ export async function confirmDiscard() {
 
 export function bindLifecycle() {
   appWindow.onCloseRequested(async (event) => {
-    if (!S.dirty) return;
     event.preventDefault();
-    if (S.autosave) {
-      await flushSave();
-      appWindow.destroy();
-      return;
+    if (S.dirty) {
+      if (S.autosave) await flushSave();
+      else if (!(await confirmDiscard())) return;
     }
-    if (await confirmDiscard()) {
-      S.dirty = false;
-      appWindow.destroy();
-    }
+    await shutdown();
+    appWindow.destroy();
   });
 
   // Losing focus is a natural commit point.

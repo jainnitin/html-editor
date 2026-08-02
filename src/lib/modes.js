@@ -6,6 +6,7 @@
 import { $, win, toast } from './dom.js';
 import { S } from './state.js';
 import { applyModes } from './viewport.js';
+import { track } from './telemetry.js';
 
 const MODE_LABEL = { edit: 'Editing', view: 'Viewing' };
 
@@ -34,6 +35,7 @@ export function setMode(next) {
 
   syncButtons();
   applyModes();
+  track('mode_changed', { mode: next });
   if (S.editing) win()?.focus();
 }
 
@@ -61,6 +63,7 @@ export function toggleTrim() {
   syncButtons();
   applyModes();
   if (S.trimming) {
+    track('trim_mode_entered');
     toast('Trimming — click a block to delete it. Hold ⌥ for its parent, Esc to stop.', 3200);
   }
 }

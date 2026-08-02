@@ -8,6 +8,7 @@
 import { $, doc, win, toast } from './dom.js';
 import { S, markDirty } from './state.js';
 import { pushUndo } from './history.js';
+import { track, bucket } from './telemetry.js';
 
 /** Text inside these elements is code or markup, never prose. */
 const SKIP_TEXT = /^(SCRIPT|STYLE|NOSCRIPT|TEXTAREA)$/;
@@ -122,11 +123,13 @@ export function replaceAll() {
   pushUndo(() => touched.forEach(([node, old]) => { node.nodeValue = old; }));
   markDirty();
   refreshCount();
+  track('replace_all', { count: bucket(n) });
   toast(`Replaced ${n} occurrence${n === 1 ? '' : 's'} — ⌘Z to undo`);
 }
 
 export function openFind() {
   if (!S.filePath) return;
+  track('find_opened');
   $('findbar').hidden = false;
   $('fq').focus();
   $('fq').select();

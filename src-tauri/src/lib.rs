@@ -293,11 +293,24 @@ struct Settings {
     recents: Vec<String>,
     #[serde(default = "yes")]
     autosave: bool,
+    /// Anonymous usage reporting. Honoured on load; set to false in
+    /// settings.json to disable.
+    #[serde(default = "yes")]
+    telemetry: bool,
+    /// Random per-installation id. Not derived from anything about the machine
+    /// or the user, and reset by clearing the settings file.
+    #[serde(default)]
+    install_id: String,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Self { recents: Vec::new(), autosave: true }
+        Self {
+            recents: Vec::new(),
+            autosave: true,
+            telemetry: true,
+            install_id: String::new(),
+        }
     }
 }
 
@@ -322,7 +335,7 @@ fn load_settings(app: &AppHandle) -> Settings {
                 .ok()
                 .and_then(|t| serde_json::from_str(&t).ok())
                 .unwrap_or_default();
-            Settings { recents, autosave: true }
+            Settings { recents, ..Settings::default() }
         });
     s.recents.retain(|p| Path::new(p).exists());
     s
@@ -352,6 +365,27 @@ fn set_autosave(app: AppHandle, on: bool) {
     s.autosave = on;
     store_settings(&app, &s);
     refresh_menu(&app);
+}
+
+/// Persist the anonymous installation id the frontend generated.
+#[tauri::command]
+fn set_install_id(app: AppHandle, id: String) {
+    let mut s = load_settings(&app);
+    if s.install_id.is_empty() {
+        s.install_id = id;
+        store_settings(&app, &s);
+    }
+}
+
+/// Coarse environment facts for telemetry. Deliberately excludes hostname,
+/// username, locale and anything else that could narrow down an individual.
+#[tauri::command]
+fn environment() -> serde_json::Value {
+    serde_json::json!({
+        "os": std::env::consts::OS,
+        "arch": std::env::consts::ARCH,
+        "version": env!("CARGO_PKG_VERSION"),
+    })
 }
 
 #[tauri::command]
@@ -536,6 +570,8 @@ pub fn run() {
             clear_recents,
             get_settings,
             set_autosave,
+            set_install_id,
+            environment,
             open_in_browser,
             open_document,
             pick_save_path,

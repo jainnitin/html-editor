@@ -8,6 +8,7 @@
 import { doc, toast } from './dom.js';
 import { S, markDirty } from './state.js';
 import { pushUndo } from './history.js';
+import { track } from './telemetry.js';
 
 /**
  * Candidate blocks, smallest first — the shapes generated reports actually
@@ -80,5 +81,6 @@ export function trimBlock(goUp) {
   el.remove();
 
   markDirty();
+  track('trim_block', { tag: el.tagName.toLowerCase() });
   toast(`Removed <${label}> — ⌘Z to undo`);
 }

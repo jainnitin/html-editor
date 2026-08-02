@@ -6,6 +6,7 @@
 import { doc, toast } from './dom.js';
 import { S } from './state.js';
 import { clearHover } from './trim.js';
+import { track, bucket } from './telemetry.js';
 
 /**
  * Injected into every opened document. These styles are stripped on save, so
@@ -84,6 +85,7 @@ export function markGeneratedRegions() {
       }
     }
     if (n) {
+      track('generated_regions_found', { count: bucket(n) });
       toast(
         `${n} region${n > 1 ? 's are' : ' is'} rendered by this report’s own ` +
           'scripts — outlined in amber while editing.',

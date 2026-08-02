@@ -30,6 +30,7 @@ import { onDocMove, clearHover, trimBlock } from './lib/trim.js';
 import { exec, syncActive } from './lib/format.js';
 import { openFind, closeFind, isFindOpen, bindFind } from './lib/find.js';
 import { linkFromSelection, openLinkDialog, showAudit, bindLinks } from './lib/links.js';
+import * as telemetry from './lib/telemetry.js';
 import {
   openDialog,
   loadPath,
@@ -211,8 +212,18 @@ invoke('get_settings')
     S.autosave = s.autosave !== false;
     setTitle();
     setSaveState();
+    return telemetry.init(s);
   })
   .catch(() => {});
+
+// Report unhandled failures in the editor itself, never anything from the
+// document being edited.
+window.addEventListener('error', (e) => {
+  telemetry.trackError('uncaught', String(e.message).slice(0, 200));
+});
+window.addEventListener('unhandledrejection', () => {
+  telemetry.trackError('unhandled_rejection', 'promise rejected');
+});
 
 // Anything Finder handed us before the UI was listening.
 invoke('frontend_ready')

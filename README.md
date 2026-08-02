@@ -164,6 +164,69 @@ The frontend is granted no filesystem permissions at all — see
 
 ---
 
+## Telemetry
+
+The app reports anonymous usage to Application Insights so real usage can guide
+what gets built next.
+
+**What is sent:** which features were used (`file_opened`, `file_saved`,
+`trim_block`, `replace_all`, `link_audit`, `mode_changed`, …), the app version,
+OS and architecture, session length, and unhandled errors from the editor.
+
+**What is never sent:** file paths, file names, document content, anything typed
+into the editor, hostnames, usernames, or IP-derived location. Sizes and counts
+go out as buckets (`<=100`, `<=500`, …) rather than exact figures, so a document
+cannot be fingerprinted from its telemetry.
+
+Identity is a random per-installation UUID stored in `settings.json`. It is not
+derived from the machine or the user, and deleting that file resets it. To turn
+reporting off entirely, set `"telemetry": false` in:
+
+```
+~/Library/Application Support/com.nitin.htmleditor/settings.json    # macOS
+%APPDATA%\com.nitin.htmleditor\settings.json                        # Windows
+```
+
+Events are queued and flushed on a timer, when the window loses focus, and on
+close. A failed batch is dropped rather than retried, so telemetry can never
+back up or interfere with editing.
+
+Delivery uses `fetch` against the Application Insights ingestion REST API, which
+keeps it free of any SDK on either side.
+
+### Sharing an Application Insights resource
+
+This app reports into a resource that also receives telemetry from another
+product. **Application Insights has a fixed schema — you cannot add a table**, so
+separation has to come from filtering, not storage.
+
+Every event is therefore tagged `cloud_RoleName = "html-editor"`, and every
+query in `telemetry/dashboard-html-editor.json` is scoped to it.
+
+That protects *this* dashboard. It does not protect the other one: a dashboard
+whose queries do not name an application will absorb whatever else reports in.
+`telemetry/patch_gsd_dashboard.py` adds an exclusion to each table reference in
+such a dashboard. It excludes known foreign apps rather than allow-listing, so
+existing roles keep flowing and nothing needs to be known about them.
+
+```bash
+python3 telemetry/patch_gsd_dashboard.py path/to/dashboard.json
+```
+
+### Dashboard
+
+Import `telemetry/dashboard-html-editor.json` at
+[dataexplorer.azure.com/dashboards](https://dataexplorer.azure.com/dashboards) —
+**New dashboard → Import from file**. One page, six tiles: daily active installs,
+sessions and documents per day, feature usage, versions in use, document size
+distribution, and errors.
+
+Regenerate it after changing the queries:
+
+```bash
+python3 telemetry/build_dashboard.py
+```
+
 ## How it works
 
 - The document is loaded with `<iframe srcdoc>`, so its own CSS and scripts run
