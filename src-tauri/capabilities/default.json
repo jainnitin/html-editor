@@ -1,13 +1,15 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Least-privilege surface for the main window. Every filesystem and shell operation lives in Rust behind an authorization check, so the frontend is granted nothing beyond window titling and the two message dialogs.",
+  "description": "Least-privilege surface for the main window. Every filesystem and shell operation lives in Rust behind an authorization check, so the frontend is granted only dialogs, update checks and the relaunch that follows one.",
   "windows": ["main"],
   "permissions": [
     "core:default",
     "core:window:allow-set-title",
     "core:window:allow-destroy",
     "dialog:allow-message",
-    "dialog:allow-ask"
+    "dialog:allow-ask",
+    "updater:default",
+    "process:allow-restart"
   ]
 }

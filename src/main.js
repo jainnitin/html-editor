@@ -31,6 +31,7 @@ import { exec, syncActive } from './lib/format.js';
 import { openFind, closeFind, isFindOpen, bindFind } from './lib/find.js';
 import { linkFromSelection, openLinkDialog, showAudit, bindLinks } from './lib/links.js';
 import * as telemetry from './lib/telemetry.js';
+import { checkForUpdates, startUpdateSchedule } from './lib/updater.js';
 import {
   openDialog,
   loadPath,
@@ -105,6 +106,7 @@ const COMMANDS = {
   browser: openInBrowser,
   reveal: revealInFinder,
   recent_clear: () => invoke('clear_recents').catch(() => {}),
+  check_updates: () => checkForUpdates(true),
 
   mode_edit: () => setMode('edit'),
   mode_view: () => setMode('view'),
@@ -215,6 +217,8 @@ invoke('get_settings')
     return telemetry.init(s);
   })
   .catch(() => {});
+
+startUpdateSchedule();
 
 // Report unhandled failures in the editor itself, never anything from the
 // document being edited.

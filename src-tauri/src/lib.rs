@@ -474,6 +474,8 @@ fn build_menu(app: &AppHandle, settings: &Settings) -> tauri::Result<Menu<tauri:
         &[
             &PredefinedMenuItem::about(app, Some("About HTML Editor"), Some(about))?,
             &PredefinedMenuItem::separator(app)?,
+            &item("check_updates", "Check for Updates…", None)?,
+            &PredefinedMenuItem::separator(app)?,
             &PredefinedMenuItem::hide(app, None)?,
             &PredefinedMenuItem::hide_others(app, None)?,
             &PredefinedMenuItem::separator(app)?,
@@ -560,6 +562,8 @@ fn build_menu(app: &AppHandle, settings: &Settings) -> tauri::Result<Menu<tauri:
 pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(Startup::default())
         .manage(Authorized::default())
         .invoke_handler(tauri::generate_handler![
