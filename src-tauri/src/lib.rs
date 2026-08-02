@@ -1,12 +1,12 @@
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
-use tauri_plugin_dialog::DialogExt;
-use serde::{Deserialize, Serialize};
 use tauri::menu::{AboutMetadata, CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{AppHandle, Emitter, Manager, State};
+use tauri_plugin_dialog::DialogExt;
 
 const MAX_RECENTS: usize = 10;
 
@@ -46,9 +46,8 @@ impl Authorized {
             .0
             .lock()
             .map(|set| {
-                set.iter().any(|p| {
-                    p == &want || p.canonicalize().map(|c| c == want).unwrap_or(false)
-                })
+                set.iter()
+                    .any(|p| p == &want || p.canonicalize().map(|c| c == want).unwrap_or(false))
             })
             .unwrap_or(false);
         if ok {
@@ -184,7 +183,11 @@ fn shell_open(target: &str, reveal: bool) -> Result<(), String> {
         Ok(())
     } else {
         let err = String::from_utf8_lossy(&out.stderr).trim().to_string();
-        Err(if err.is_empty() { "the system could not open it".into() } else { err })
+        Err(if err.is_empty() {
+            "the system could not open it".into()
+        } else {
+            err
+        })
     }
 }
 
@@ -256,7 +259,11 @@ fn open_in_browser(auth: State<Authorized>, path: String) -> Result<String, Stri
 /// schemes can hand off to other installed applications.
 #[tauri::command]
 fn open_external_url(url: String) -> Result<(), String> {
-    let scheme = url.split(':').next().unwrap_or_default().to_ascii_lowercase();
+    let scheme = url
+        .split(':')
+        .next()
+        .unwrap_or_default()
+        .to_ascii_lowercase();
     if !matches!(scheme.as_str(), "http" | "https" | "mailto") {
         return Err(format!("refusing to open a \"{scheme}\" URL"));
     }
@@ -335,7 +342,10 @@ fn load_settings(app: &AppHandle) -> Settings {
                 .ok()
                 .and_then(|t| serde_json::from_str(&t).ok())
                 .unwrap_or_default();
-            Settings { recents, ..Settings::default() }
+            Settings {
+                recents,
+                ..Settings::default()
+            }
         });
     s.recents.retain(|p| Path::new(p).exists());
     s
@@ -430,21 +440,34 @@ fn recent_label(path: &str, all: &[String]) -> String {
 
 fn build_menu(app: &AppHandle, settings: &Settings) -> tauri::Result<Menu<tauri::Wry>> {
     let recents: &[String] = &settings.recents;
-    let item = |id: &str, label: &str, accel: Option<&str>| {
-        MenuItem::with_id(app, id, label, true, accel)
-    };
+    let item =
+        |id: &str, label: &str, accel: Option<&str>| MenuItem::with_id(app, id, label, true, accel);
 
     let recent_menu = if recents.is_empty() {
         Submenu::with_items(
             app,
             "Open Recent",
             true,
-            &[&MenuItem::with_id(app, "recent_none", "No Recent Files", false, None::<&str>)?],
+            &[&MenuItem::with_id(
+                app,
+                "recent_none",
+                "No Recent Files",
+                false,
+                None::<&str>,
+            )?],
         )?
     } else {
         let items = recents
             .iter()
-            .map(|p| MenuItem::with_id(app, format!("recent:{p}"), recent_label(p, recents), true, None::<&str>))
+            .map(|p| {
+                MenuItem::with_id(
+                    app,
+                    format!("recent:{p}"),
+                    recent_label(p, recents),
+                    true,
+                    None::<&str>,
+                )
+            })
             .collect::<tauri::Result<Vec<_>>>()?;
         let sub = Submenu::new(app, "Open Recent", true)?;
         for i in &items {
@@ -495,7 +518,14 @@ fn build_menu(app: &AppHandle, settings: &Settings) -> tauri::Result<Menu<tauri:
             &item("save_as", "Save As…", Some("Shift+CmdOrCtrl+S"))?,
             &item("save_copy", "Save a Copy…", Some("Alt+CmdOrCtrl+S"))?,
             &PredefinedMenuItem::separator(app)?,
-            &CheckMenuItem::with_id(app, "toggle_autosave", "Auto-save", true, settings.autosave, None::<&str>)?,
+            &CheckMenuItem::with_id(
+                app,
+                "toggle_autosave",
+                "Auto-save",
+                true,
+                settings.autosave,
+                None::<&str>,
+            )?,
             &PredefinedMenuItem::separator(app)?,
             &item("browser", "Open in Browser", Some("Shift+CmdOrCtrl+B"))?,
             &item("reveal", "Reveal in Finder", Some("Shift+CmdOrCtrl+R"))?,
