@@ -61,7 +61,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNBREI1OEFFMzQ5N0MwOUQKUldTZHdKYzBybGpiT2xYcHB1NVFkQWVDck1BM3BaakdCOTlZWFV2ek1oSlI1RERBdnNYTXB1YmQK",
       "endpoints": [
-        "https://github.com/jainniti_microsoft/html-editor/releases/latest/download/latest.json"
+        "https://github.com/jainnitin/html-editor/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "passive"
