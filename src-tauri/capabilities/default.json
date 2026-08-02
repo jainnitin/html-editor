@@ -1,19 +1,13 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main window",
-  "windows": [
-    "main"
-  ],
+  "description": "Least-privilege surface for the main window. Every filesystem and shell operation lives in Rust behind an authorization check, so the frontend is granted nothing beyond window titling and the two message dialogs.",
+  "windows": ["main"],
   "permissions": [
     "core:default",
     "core:window:allow-set-title",
     "core:window:allow-destroy",
-    "opener:default",
-    "opener:allow-open-url",
-    "opener:allow-reveal-item-in-dir",
-    "dialog:default",
-    "dialog:allow-ask",
-    "dialog:allow-confirm"
+    "dialog:allow-message",
+    "dialog:allow-ask"
   ]
 }

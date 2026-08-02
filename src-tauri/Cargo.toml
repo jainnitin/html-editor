@@ -1,9 +1,10 @@
 [package]
 name = "html-editor"
-version = "0.1.0"
+version = "1.0.0"
 description = "WYSIWYG editor for standalone HTML reports"
 authors = ["Nitin Jain"]
 edition = "2021"
+license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -19,8 +20,17 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
-tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri-plugin-dialog = "2"
 
+
+# Optimise for size: this is a desktop utility, not a hot loop, and a smaller
+# binary means a smaller download and less to link.
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+incremental = false

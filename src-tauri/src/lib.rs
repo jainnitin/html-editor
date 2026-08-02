@@ -1,7 +1,9 @@
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
+use tauri_plugin_dialog::DialogExt;
 use serde::{Deserialize, Serialize};
 use tauri::menu::{AboutMetadata, CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -15,10 +17,106 @@ struct Startup {
     ready: AtomicBool,
 }
 
+/// Paths the user has explicitly chosen, via the native file dialogs, a Finder
+/// "Open With", or a drag onto the window.
+///
+/// This exists because an opened document is not trusted input. The report is
+/// rendered in a `srcdoc` iframe, which is same-origin with the app, so any
+/// script inside it can reach `parent.__TAURI_INTERNALS__` and call these
+/// commands directly. Without this gate, merely opening a file would grant that
+/// file's scripts arbitrary read and write access to the user's disk.
+///
+/// Only Rust may add to this set, and only in response to a user gesture.
+#[derive(Default)]
+struct Authorized(Mutex<HashSet<PathBuf>>);
+
+impl Authorized {
+    fn allow(&self, path: impl Into<PathBuf>) {
+        if let Ok(mut set) = self.0.lock() {
+            set.insert(path.into());
+        }
+    }
+
+    /// Compare canonical paths so `/tmp/x` and `/private/tmp/x`, or any `..`
+    /// trickery, cannot slip past the check.
+    fn check(&self, path: &str) -> Result<(), String> {
+        let want = Path::new(path);
+        let want = want.canonicalize().unwrap_or_else(|_| want.to_path_buf());
+        let ok = self
+            .0
+            .lock()
+            .map(|set| {
+                set.iter().any(|p| {
+                    p == &want || p.canonicalize().map(|c| c == want).unwrap_or(false)
+                })
+            })
+            .unwrap_or(false);
+        if ok {
+            Ok(())
+        } else {
+            Err(format!(
+                "{path} was not opened by you in this session, so it cannot be read or written"
+            ))
+        }
+    }
+}
+
+fn filters() -> (&'static str, Vec<&'static str>) {
+    ("HTML", vec!["html", "htm", "bak"])
+}
+
+/// Show the open dialog and return the chosen file with its contents. The
+/// dialog lives in Rust so that picking a file is what grants access to it.
+#[tauri::command]
+async fn open_document(app: AppHandle) -> Result<Option<(String, String)>, String> {
+    let (name, exts) = filters();
+    let picked = tauri::async_runtime::spawn_blocking(move || {
+        app.dialog()
+            .file()
+            .add_filter(name, &exts)
+            .blocking_pick_file()
+            .and_then(|f| f.into_path().ok())
+            .map(|p| (app, p))
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let Some((app, path)) = picked else {
+        return Ok(None);
+    };
+    let text = fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+    app.state::<Authorized>().allow(path.clone());
+    Ok(Some((path.to_string_lossy().into_owned(), text)))
+}
+
+/// Show the save dialog and return the chosen destination, authorizing it.
+#[tauri::command]
+async fn pick_save_path(app: AppHandle, suggested: String) -> Result<Option<String>, String> {
+    let (name, exts) = filters();
+    let picked = tauri::async_runtime::spawn_blocking(move || {
+        app.dialog()
+            .file()
+            .add_filter(name, &exts)
+            .set_file_name(suggested)
+            .blocking_save_file()
+            .and_then(|f| f.into_path().ok())
+            .map(|p| (app, p))
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let Some((app, path)) = picked else {
+        return Ok(None);
+    };
+    app.state::<Authorized>().allow(path.clone());
+    Ok(Some(path.to_string_lossy().into_owned()))
+}
+
 /// Read any file the user picked in a native dialog, dropped on the window,
 /// or opened from Finder.
 #[tauri::command]
-fn read_text_file(path: String) -> Result<String, String> {
+fn read_text_file(auth: State<Authorized>, path: String) -> Result<String, String> {
+    auth.check(&path)?;
     fs::read_to_string(&path).map_err(|e| format!("{path}: {e}"))
 }
 
@@ -26,7 +124,13 @@ fn read_text_file(path: String) -> Result<String, String> {
 /// stash the untouched original next to it, so a bad edit is always recoverable.
 /// Returns whether a backup was actually created.
 #[tauri::command]
-fn write_text_file(path: String, contents: String, backup: bool) -> Result<bool, String> {
+fn write_text_file(
+    auth: State<Authorized>,
+    path: String,
+    contents: String,
+    backup: bool,
+) -> Result<bool, String> {
+    auth.check(&path)?;
     let mut made = false;
     if backup {
         let bak = format!("{path}.bak");
@@ -39,74 +143,131 @@ fn write_text_file(path: String, contents: String, backup: bool) -> Result<bool,
     Ok(made)
 }
 
-/// The bundle id of whatever handles `https:` — i.e. the user's real browser.
-/// We deliberately do not use the `public.html` handler: this app registers as
-/// an editor for .html and could itself become that handler.
-#[cfg(target_os = "macos")]
-fn default_browser_bundle_id() -> Option<String> {
-    let plist = dirs_home()?
-        .join("Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist");
-    let out = std::process::Command::new("plutil")
-        .args(["-convert", "json", "-o", "-"])
-        .arg(&plist)
-        .output()
-        .ok()?;
-    let json: serde_json::Value = serde_json::from_slice(&out.stdout).ok()?;
-    let handlers = json.get("LSHandlers")?.as_array()?;
-    let id = handlers.iter().find_map(|h| {
-        let scheme = h.get("LSHandlerURLScheme")?.as_str()?;
-        (scheme == "https" || scheme == "http")
-            .then(|| h.get("LSHandlerRoleAll")?.as_str().map(str::to_owned))
-            .flatten()
-    })?;
-    (id != "com.nitin.htmleditor").then_some(id)
+/* ---------------- platform shims ---------------- */
+
+/// Launch a URL or path with the platform's default handler.
+fn shell_open(target: &str, reveal: bool) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    let mut cmd = {
+        let mut c = std::process::Command::new("open");
+        if reveal {
+            c.arg("-R");
+        }
+        c.arg(target);
+        c
+    };
+
+    #[cfg(target_os = "windows")]
+    let mut cmd = {
+        if reveal {
+            let mut c = std::process::Command::new("explorer.exe");
+            c.arg(format!("/select,{target}"));
+            c
+        } else {
+            // `start` is a cmd builtin; the empty string is the window title,
+            // which `start` would otherwise take from a quoted first argument.
+            let mut c = std::process::Command::new("cmd");
+            c.args(["/C", "start", "", target]);
+            c
+        }
+    };
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let mut cmd = {
+        let mut c = std::process::Command::new(if reveal { "nautilus" } else { "xdg-open" });
+        c.arg(target);
+        c
+    };
+
+    let out = cmd.output().map_err(|e| e.to_string())?;
+    if out.status.success() {
+        Ok(())
+    } else {
+        let err = String::from_utf8_lossy(&out.stderr).trim().to_string();
+        Err(if err.is_empty() { "the system could not open it".into() } else { err })
+    }
 }
 
-#[cfg(target_os = "macos")]
-fn dirs_home() -> Option<PathBuf> {
-    std::env::var_os("HOME").map(PathBuf::from)
+/// The application registered for `https:` — i.e. the user's real browser.
+///
+/// We deliberately avoid the HTML file association: this app registers itself
+/// as an editor for `.html`, so opening the file with its default handler could
+/// simply reopen it here.
+fn default_browser() -> Option<String> {
+    #[cfg(target_os = "macos")]
+    {
+        let plist = std::env::var_os("HOME").map(PathBuf::from)?.join(
+            "Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist",
+        );
+        let out = std::process::Command::new("plutil")
+            .args(["-convert", "json", "-o", "-"])
+            .arg(&plist)
+            .output()
+            .ok()?;
+        let json: serde_json::Value = serde_json::from_slice(&out.stdout).ok()?;
+        let id = json.get("LSHandlers")?.as_array()?.iter().find_map(|h| {
+            let scheme = h.get("LSHandlerURLScheme")?.as_str()?;
+            matches!(scheme, "https" | "http")
+                .then(|| h.get("LSHandlerRoleAll")?.as_str().map(str::to_owned))
+                .flatten()
+        })?;
+        (id != "com.nitin.htmleditor").then_some(id)
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        None
+    }
 }
 
-/// Open the saved file in the user's web browser. Implemented here rather than
-/// through the opener plugin, whose `open_path` command is filesystem-scoped and
-/// would need a blanket allow-list to work on arbitrary user-chosen files.
+/// Open the saved file in the user's web browser.
+///
+/// Implemented here rather than through the opener plugin, whose `open_path`
+/// command is filesystem-scoped and would need a blanket allow-list to work on
+/// arbitrary user-chosen files.
 #[tauri::command]
-fn open_in_browser(path: String) -> Result<String, String> {
+fn open_in_browser(auth: State<Authorized>, path: String) -> Result<String, String> {
+    auth.check(&path)?;
     if !Path::new(&path).exists() {
         return Err(format!("{path} no longer exists"));
     }
 
     #[cfg(target_os = "macos")]
-    {
-        let mut cmd = std::process::Command::new("open");
-        let browser = default_browser_bundle_id();
-        if let Some(id) = &browser {
-            cmd.arg("-b").arg(id);
-        }
-        let out = cmd.arg(&path).output().map_err(|e| e.to_string())?;
+    if let Some(id) = default_browser() {
+        let out = std::process::Command::new("open")
+            .args(["-b", &id])
+            .arg(&path)
+            .output()
+            .map_err(|e| e.to_string())?;
         if out.status.success() {
-            return Ok(browser.unwrap_or_else(|| "default application".into()));
+            return Ok(id);
         }
-        // A stale or wrong bundle id should not be fatal — retry with the
-        // system default handler.
-        if browser.is_some() {
-            let retry = std::process::Command::new("open")
-                .arg(&path)
-                .output()
-                .map_err(|e| e.to_string())?;
-            if retry.status.success() {
-                return Ok("default application".into());
-            }
-            return Err(String::from_utf8_lossy(&retry.stderr).trim().to_string());
-        }
-        return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
+        // A stale bundle id should not be fatal; fall through to the default
+        // handler below.
     }
 
-    #[cfg(not(target_os = "macos"))]
-    {
-        let _ = path;
-        Err("unsupported platform".into())
+    shell_open(&path, false).map(|()| "default application".to_string())
+}
+
+/// Open a link from the document in the user's browser.
+///
+/// Documents are untrusted, so the scheme is allow-listed: `file:` and `smb:`
+/// would let a report pull in arbitrary local or remote content, and custom
+/// schemes can hand off to other installed applications.
+#[tauri::command]
+fn open_external_url(url: String) -> Result<(), String> {
+    let scheme = url.split(':').next().unwrap_or_default().to_ascii_lowercase();
+    if !matches!(scheme.as_str(), "http" | "https" | "mailto") {
+        return Err(format!("refusing to open a \"{scheme}\" URL"));
     }
+    shell_open(&url, false)
+}
+
+/// Show the file in the platform's file manager.
+#[tauri::command]
+fn reveal_in_finder(auth: State<Authorized>, path: String) -> Result<(), String> {
+    auth.check(&path)?;
+    shell_open(&path, true)
 }
 
 /// Called once the UI is listening. Returns anything Finder queued up first.
@@ -364,9 +525,9 @@ fn build_menu(app: &AppHandle, settings: &Settings) -> tauri::Result<Menu<tauri:
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(Startup::default())
+        .manage(Authorized::default())
         .invoke_handler(tauri::generate_handler![
             read_text_file,
             write_text_file,
@@ -375,7 +536,11 @@ pub fn run() {
             clear_recents,
             get_settings,
             set_autosave,
-            open_in_browser
+            open_in_browser,
+            open_document,
+            pick_save_path,
+            open_external_url,
+            reveal_in_finder
         ])
         .setup(|app| {
             let handle = app.handle();
@@ -385,6 +550,14 @@ pub fn run() {
         })
         .on_menu_event(|app, event| {
             let _ = app.emit("menu", event.id().0.as_str());
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) = event {
+                let auth = window.state::<Authorized>();
+                for p in paths {
+                    auth.allow(p.clone());
+                }
+            }
         })
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
@@ -399,6 +572,11 @@ pub fn run() {
                 .collect();
             if paths.is_empty() {
                 return;
+            }
+            if let Some(auth) = handle.try_state::<Authorized>() {
+                for p in &paths {
+                    auth.allow(PathBuf::from(p));
+                }
             }
             let Some(state) = handle.try_state::<Startup>() else {
                 return;
