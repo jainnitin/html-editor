@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use serde::{Deserialize, Serialize};
-use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
+use tauri::menu::{AboutMetadata, CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::{AppHandle, Emitter, Manager, State};
 
 const MAX_RECENTS: usize = 10;
@@ -260,12 +260,24 @@ fn build_menu(app: &AppHandle, settings: &Settings) -> tauri::Result<Menu<tauri:
         sub
     };
 
+    // macOS shows `credits` and `copyright` in the About panel but ignores
+    // `authors`, which is kept for the other platforms.
+    let about = AboutMetadata {
+        name: Some("HTML Editor".into()),
+        version: Some(env!("CARGO_PKG_VERSION").into()),
+        authors: Some(vec!["Nitin Jain".into()]),
+        credits: Some("Created by Nitin Jain".into()),
+        copyright: Some("\u{00a9} 2026 Nitin Jain".into()),
+        comments: Some("Hand-tweak generated HTML reports.".into()),
+        ..Default::default()
+    };
+
     let app_menu = Submenu::with_items(
         app,
         "HTML Editor",
         true,
         &[
-            &PredefinedMenuItem::about(app, None, None)?,
+            &PredefinedMenuItem::about(app, Some("About HTML Editor"), Some(about))?,
             &PredefinedMenuItem::separator(app)?,
             &PredefinedMenuItem::hide(app, None)?,
             &PredefinedMenuItem::hide_others(app, None)?,

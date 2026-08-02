@@ -2,7 +2,7 @@
 name = "html-editor"
 version = "0.1.0"
 description = "WYSIWYG editor for standalone HTML reports"
-authors = ["you"]
+authors = ["Nitin Jain"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
