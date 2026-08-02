@@ -14,8 +14,17 @@
 
 import { invoke } from '@tauri-apps/api/core';
 
-const INGEST = '<redacted>';
-const IKEY = '<redacted>';
+/**
+ * Supplied at build time so no endpoint or key is committed:
+ *
+ *   VITE_AI_INGEST=https://<region>.in.applicationinsights.azure.com/v2/track
+ *   VITE_AI_IKEY=<instrumentation key>
+ *
+ * With either missing telemetry stays off, which is the default for a source
+ * build and for anyone running their own copy.
+ */
+const INGEST = import.meta.env.VITE_AI_INGEST || '';
+const IKEY = import.meta.env.VITE_AI_IKEY || '';
 const ROLE = 'html-editor';
 
 const FLUSH_AFTER_MS = 20_000;
@@ -120,7 +129,8 @@ export function trackError(type, message, properties) {
 }
 
 export async function init(settings) {
-  enabled = settings?.telemetry !== false;
+  enabled = settings?.telemetry !== false && !!INGEST && !!IKEY;
+  if (!enabled) return;
 
   installId = settings?.install_id || '';
   if (!installId) {
