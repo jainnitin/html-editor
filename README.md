@@ -1,7 +1,7 @@
 # HTML Editor
 
 A small desktop app for hand-tweaking self-contained HTML reports — the kind a
-model generates, with inline CSS and JavaScript in a single file. Fix the
+LLM generates, with inline CSS and JavaScript in a single file. Fix the
 wording, repoint the links, delete the block it invented, save. The output stays
 one standalone file.
 
@@ -54,42 +54,6 @@ Everything else lives in the menu bar: **File** (open, recents, save as, save a
 copy, auto-save, reveal), **Edit** (undo, find), **Format**, and **Tools**
 (Editing `⌘E` / Viewing `⇧⌘E`, Trim `⌘D`, Link audit `⇧⌘L`).
 
-## Guard rails
-
-**Script-generated regions.** Some reports build parts of themselves at runtime,
-filling containers that are *empty* in the file on disk. Edits there look fine
-and vanish on reload. On open, the app diffs the live DOM against an inert parse
-of the source, outlines any such region in amber, and warns the first time you
-type inside one.
-
-**Untrusted documents.** An opened report is not trusted input. It renders in a
-`srcdoc` iframe, which is same-origin with the app, so its scripts can reach the
-app's own IPC. Sandboxing is not an option — the editor needs same-origin DOM
-access to work.
-
-So every filesystem command is gated in Rust on an authorization set: only paths
-you explicitly chose this session — a native dialog, a Finder "Open With", or a
-drag onto the window — can be read or written, compared by canonical path so
-`..` and symlinks cannot slip through. A malicious report can still rewrite its
-own file, which editing it would do anyway, but nothing else. The file dialogs
-live in Rust for the same reason: picking a file is what grants access to it.
-
-Links opened externally are restricted to `http`, `https` and `mailto`, and the
-frontend holds no filesystem permissions at all — see
-`src-tauri/capabilities/default.json`.
-
-## Updates
-
-The app checks at launch and once a day, and **⌘ menu → Check for Updates…**
-checks on demand. It downloads a prebuilt bundle for the running platform,
-verifies it and offers to restart — nobody has to clone or pull to get a new
-version, and nothing is compiled on your machine.
-
-Each bundle is signed in CI with a key that never leaves it, and the matching
-public key is compiled into the app, so a tampered or substituted download is
-rejected before it can run. This is independent of Apple code signing; the app
-itself stays unsigned and runs on managed machines as before.
-
 ## Build from source
 
 | | macOS | Windows |
@@ -117,45 +81,6 @@ export TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""
 See [RELEASING.md](RELEASING.md) for cutting a release. A build leaves ~900 MB
 of intermediates in `src-tauri/target`; `cargo clean --manifest-path
 src-tauri/Cargo.toml` reclaims it.
-
-## Telemetry
-
-Off unless an endpoint is supplied at build time:
-
-```bash
-VITE_AI_INGEST=https://<region>.in.applicationinsights.azure.com/v2/track
-VITE_AI_IKEY=<instrumentation key>
-```
-
-When enabled it reports which features were used, app version, OS, session
-length and unhandled errors. It never sends file paths, file names, document
-content, or anything typed into the editor; sizes and counts go out as buckets
-so a document cannot be fingerprinted. Identity is a random per-install UUID in
-`settings.json`. Set `"telemetry": false` there to opt out.
-
-## Layout
-
-```
-index.html          toolbar, find bar, dialogs
-src/main.js         entry point — wiring only
-src/lib/
-  dom.js            element helpers, toast
-  state.js          all mutable session state
-  history.js        undo entries the browser cannot provide
-  viewport.js       the iframe: modes, generated-region detection, serialize
-  modes.js          Editing/Viewing pulldown, Trim toggle
-  trim.js           block picker
-  format.js         execCommand wrappers
-  find.js           find & replace
-  links.js          link dialog, link audit
-  documents.js      open, save, auto-save, browser hand-off
-  telemetry.js      anonymous usage reporting
-  updater.js        self-update
-src-tauri/src/lib.rs  menu bar, authorization gate, file and shell commands
-```
-
-Modules import in one direction only, and `main.js` is the only file that wires
-listeners.
 
 ## Licence
 
