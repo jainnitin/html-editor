@@ -14,6 +14,17 @@ Put the generated public key in `src-tauri/tauri.conf.json` under `plugins.updat
 
 > Losing the private key means existing installs can never auto-update again. Users would have to reinstall manually, so keep a secure backup.
 
+## Before you push
+
+```bash
+npm run preflight
+```
+
+Runs the same checks as CI — vite build, `cargo fmt --check`, clippy with
+warnings denied, workflow YAML, version agreement across the three manifests,
+and a scan for committed credentials. CI takes minutes per attempt; this takes
+seconds, and a release rejected for formatting costs a full rebuild.
+
 ## Cut a release
 
 1. Bump the version in all three places:

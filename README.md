@@ -66,6 +66,7 @@ copy, auto-save, reveal), **Edit** (undo, find), **Format**, and **Tools**
 npm install
 npm run tauri dev      # hot-reloading window
 npm run tauri build    # release bundles
+npm run preflight      # everything CI runs, in seconds — do this before pushing
 ```
 
 Bundles land in `src-tauri/target/release/bundle/`. The bundler only builds
