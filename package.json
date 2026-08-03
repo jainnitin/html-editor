@@ -19,5 +19,8 @@
     "@tauri-apps/plugin-updater": "^2.10.1"
   },
   "license": "MIT",
-  "description": "Hand-tweak self-contained HTML reports."
+  "description": "Hand-tweak self-contained HTML reports.",
+  "engines": {
+    "node": ">=20"
+  }
 }

@@ -59,7 +59,7 @@ copy, auto-save, reveal), **Edit** (undo, find), **Format**, and **Tools**
 | | macOS | Windows |
 | --- | --- | --- |
 | Rust | [rustup.rs](https://rustup.rs) | [rustup.rs](https://rustup.rs), MSVC toolchain |
-| Node | 20+ | 20+ |
+| Node | 24 (LTS) | 24 (LTS) |
 | Toolchain | `xcode-select --install` | [VS Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with *Desktop development with C++*, plus WebView2 (preinstalled on Win 11) |
 
 ```bash
