@@ -52,9 +52,11 @@ impl Authorized {
             .unwrap_or(false);
         if ok {
             Ok(())
+        } else if !want.exists() {
+            Err(format!("{path} no longer exists"))
         } else {
             Err(format!(
-                "{path} was not opened by you in this session, so it cannot be read or written"
+                "{path} has not been opened in this session. Open it with File \u{2023} Open\u{2026},                  or drag it onto the window."
             ))
         }
     }
@@ -408,14 +410,20 @@ fn environment() -> serde_json::Value {
     })
 }
 
+/// Record a file in Open Recent.
+///
+/// Restricted to paths already authorized this session so a document cannot
+/// plant an arbitrary path in the menu, where a later click would authorize it.
 #[tauri::command]
-fn push_recent(app: AppHandle, path: String) {
+fn push_recent(app: AppHandle, auth: State<Authorized>, path: String) -> Result<(), String> {
+    auth.check(&path)?;
     let mut s = load_settings(&app);
     s.recents.retain(|p| p != &path);
     s.recents.insert(0, path);
     s.recents.truncate(MAX_RECENTS);
     store_settings(&app, &s);
     refresh_menu(&app);
+    Ok(())
 }
 
 #[tauri::command]
@@ -629,7 +637,17 @@ pub fn run() {
             Ok(())
         })
         .on_menu_event(|app, event| {
-            let _ = app.emit("menu", event.id().0.as_str());
+            let id = event.id().0.as_str();
+            // Picking a file from Open Recent is a user gesture, exactly like
+            // choosing it in a dialog, so it grants access to that path. The
+            // frontend cannot authorize anything itself; only this handler and
+            // the dialogs can.
+            if let Some(path) = id.strip_prefix("recent:") {
+                if let Some(auth) = app.try_state::<Authorized>() {
+                    auth.allow(PathBuf::from(path));
+                }
+            }
+            let _ = app.emit("menu", id);
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::DragDrop(tauri::DragDropEvent::Drop { paths, .. }) = event {

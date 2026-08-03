@@ -15,7 +15,7 @@ import { resetMode } from './modes.js';
 import { closeFind } from './find.js';
 import { serialize } from './viewport.js';
 import { clearHistory } from './history.js';
-import { track, trackError, bucket, shutdown } from './telemetry.js';
+import { track, trackError, bucket, shutdown, docId } from './telemetry.js';
 
 const AUTOSAVE_DELAY = 1200;
 
@@ -64,9 +64,15 @@ function applyDocument(path, html) {
   setSaveState();
   invoke('push_recent', { path }).catch(() => {});
 
-  track('file_opened', {
-    size: bucket(html.length),
-    has_scripts: String(/<script[\s>]/i.test(html))
+  S.edits = 0;
+  S.docId = '';
+  docId(path).then((id) => {
+    S.docId = id;
+    track('file_opened', {
+      doc: id,
+      size: bucket(html.length),
+      has_scripts: String(/<script[\s>]/i.test(html))
+    });
   });
 }
 
@@ -102,7 +108,11 @@ export async function doSave(auto) {
     markClean();
     if (madeBackup) toast(`Original kept as ${baseName(S.filePath)}.bak`, 2600);
     else if (!auto) toast('Saved ✓');
-    track('file_saved', { trigger: auto ? 'auto' : 'manual' });
+    track(
+      'file_saved',
+      { doc: S.docId, trigger: auto ? 'auto' : 'manual' },
+      { edits: S.edits }
+    );
   } catch (e) {
     setSaveState();
     trackError('save_failed', 'write_text_file rejected');

@@ -39,6 +39,27 @@ let env = { os: 'unknown', arch: 'unknown', version: '0.0.0' };
 let started = Date.now();
 let timer = null;
 
+/**
+ * A stable, non-reversible id for a document.
+ *
+ * Lets distinct files be counted — "how many reports has this helped edit?" —
+ * without a path or name ever leaving the machine. The install id is mixed in
+ * so the same file on two machines does not produce the same hash, which would
+ * otherwise let documents be correlated across users.
+ */
+export async function docId(path) {
+  try {
+    const data = new TextEncoder().encode(`${installId}:${path}`);
+    const digest = await crypto.subtle.digest('SHA-256', data);
+    return [...new Uint8Array(digest)]
+      .slice(0, 8)
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+  } catch {
+    return '';
+  }
+}
+
 /** Report magnitudes as buckets: useful in aggregate, useless for identifying. */
 export function bucket(n) {
   if (!Number.isFinite(n) || n <= 0) return '0';
@@ -89,7 +110,8 @@ function envelope(name, properties = {}, measurements = {}, error) {
   };
 }
 
-async function flush() {
+/** Exported so callers can commit the queue before the process goes away. */
+export async function flush() {
   clearTimeout(timer);
   timer = null;
   if (!enabled || !queue.length) return;

@@ -15,7 +15,7 @@ import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { ask, message } from '@tauri-apps/plugin-dialog';
 import { toast } from './dom.js';
-import { track, trackError } from './telemetry.js';
+import { track, trackError, flush } from './telemetry.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Let the window settle before touching the network on launch. */
@@ -77,7 +77,12 @@ export async function checkForUpdates(manual = false) {
       `Version ${update.version} is installed. Restart now to use it?`,
       { title: 'Restart to finish', okLabel: 'Restart', cancelLabel: 'Later' }
     );
-    if (now) await relaunch();
+    if (now) {
+      // relaunch() ends the process, so commit the queue first or the
+      // install is never reported — the one event most worth having.
+      await flush();
+      await relaunch();
+    }
     else toast('The update will apply next time you open the app.', 4000);
   } catch (e) {
     trackError('update_failed', String(e).slice(0, 200));

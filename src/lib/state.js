@@ -27,7 +27,11 @@ export const S = {
   saving: false,
   warnedGenerated: false,
   /** Files whose pristine original has already been stashed as `.bak`. */
-  backedUp: new Set()
+  backedUp: new Set(),
+  /** Anonymous id of the open document, for counting distinct files edited. */
+  docId: '',
+  /** Edits made since the document was opened. */
+  edits: 0
 };
 
 const dirtyHooks = [];
@@ -55,6 +59,7 @@ export function setSaveState() {
 }
 
 export function markDirty() {
+  S.edits++;
   if (!S.dirty) {
     S.dirty = true;
     setTitle();
