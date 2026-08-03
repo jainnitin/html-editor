@@ -79,7 +79,43 @@ jobs:
             HTML Editor desktop release.
 
             Download the installer for your platform from the assets below. The app uses the signed updater manifest (`latest.json`) attached to this release for automatic updates.
-          releaseDraft: false
+          # Kept a draft until every platform has uploaded. GitHub never
+          # resolves /releases/latest to a draft, so installed apps keep seeing
+          # the previous complete release rather than a half-built one.
+          releaseDraft: true
           prerelease: false
           includeUpdaterJson: true
           args: ${{ matrix.args }}
+
+  publish:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tagName || github.ref_name }}
+    steps:
+      # Until now the release has been a draft, so `latest.json` listed only the
+      # platforms that happened to finish first. A macOS build finishes minutes
+      # before Windows, and an update check in that window failed with "none of
+      # the fallback platforms were found". Publishing once, at the end, means
+      # every platform appears at the same instant.
+      - name: Verify every platform is present, then publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern latest.json --output latest.json --clobber
+
+          echo "Platforms in latest.json:"
+          jq -r '.platforms | keys[]' latest.json
+
+          for p in darwin-aarch64 darwin-x86_64 windows-x86_64; do
+            jq -e --arg p "$p" '.platforms | has($p)' latest.json >/dev/null \
+              || { echo "::error::$p missing from latest.json — not publishing"; exit 1; }
+          done
+
+          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false
+          echo "Published $RELEASE_TAG with all platforms."

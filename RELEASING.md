@@ -41,6 +41,20 @@ git push origin vX.Y.Z
 
 The release workflow also supports manual `workflow_dispatch`; provide the existing `vX.Y.Z` tag when prompted.
 
+## How publishing works
+
+Each platform builds in parallel into a **draft** release, and a final job
+publishes it only once `latest.json` contains every platform.
+
+This matters because GitHub resolves `/releases/latest` to the newest published
+release. Publishing per-platform meant a macOS build could go live minutes
+before Windows, and a Windows user checking for updates in that window got
+"none of the fallback platforms were found". While the release is a draft,
+installed apps keep seeing the previous complete release instead.
+
+If the publish job fails, the release stays a draft and nobody is offered a
+partial update — fix the failing platform and re-run.
+
 ## Release outputs
 
 The workflow builds and publishes one GitHub Release containing the macOS Apple Silicon bundle, macOS Intel bundle, Windows x64 bundle, and the signed `latest.json` updater manifest consumed by `tauri-plugin-updater`.

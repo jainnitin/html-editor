@@ -85,18 +85,34 @@ export async function checkForUpdates(manual = false) {
     }
     else toast('The update will apply next time you open the app.', 4000);
   } catch (e) {
-    trackError('update_failed', String(e).slice(0, 200));
+    const raw = String(e);
+    trackError('update_failed', raw.slice(0, 200));
     if (manual) {
-      await message(`Could not check for updates.\n\n${e}`, {
-        title: 'Update failed',
-        kind: 'error'
-      });
+      await message(explain(raw), { title: 'Update failed', kind: 'error' });
     }
     // A background failure is silent on purpose: an offline or firewalled
     // machine should not be nagged every day.
   } finally {
     busy = false;
   }
+}
+
+/**
+ * Turn an updater error into something worth reading. The raw text names
+ * internal concepts like the manifest's platform table, which tells a user
+ * nothing about what to do next.
+ */
+function explain(raw) {
+  if (/platforms/i.test(raw)) {
+    return (
+      'A new version is being published right now and the build for this ' +
+      'platform is not ready yet.\n\nTry again in a few minutes.'
+    );
+  }
+  if (/network|dns|connect|timed? ?out|resolve/i.test(raw)) {
+    return `Could not reach the update server.\n\nCheck your connection and try again.\n\n${raw}`;
+  }
+  return `Could not check for updates.\n\n${raw}`;
 }
 
 /** Check shortly after launch, then once a day for long-running sessions. */
