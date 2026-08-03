@@ -125,6 +125,36 @@ Opens ready to edit — just click into the page and type.<br>
   </div>
 </dialog>
 
+<dialog id="updatedlg">
+  <div class="upd-head">
+    <svg class="upd-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 20h16"/>
+    </svg>
+    <div>
+      <h3 id="upd-title">Update available</h3>
+      <p class="upd-sub" id="upd-sub"></p>
+    </div>
+  </div>
+
+  <div class="upd-notes" id="upd-notes" hidden></div>
+
+  <a class="upd-link" id="upd-whatsnew" href="#" hidden>
+    What’s new
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7"/><path d="M9 7h8v8"/></svg>
+  </a>
+
+  <div class="upd-progress" id="upd-progress" hidden>
+    <div class="upd-bar"><div class="upd-fill" id="upd-fill"></div></div>
+    <span class="upd-pct" id="upd-pct">0%</span>
+  </div>
+
+  <div class="row">
+    <span class="grow"></span>
+    <button id="upd-later">Later</button>
+    <button id="upd-go" class="primary">Install update</button>
+  </div>
+</dialog>
+
 <dialog id="auditdlg">
   <h3>Link audit</h3>
   <div id="auditsum"></div>

@@ -333,3 +333,84 @@ dialog button.primary { background: var(--accent); border-color: var(--accent) }
 }
 #savestate:empty { display: none }
 #savestate.edited { margin-right: 8px }
+
+/* ---------------- update dialog ---------------- */
+
+#updatedlg { min-width: 460px; max-width: 520px }
+
+.upd-head { display: flex; gap: 14px; align-items: flex-start }
+.upd-head h3 { margin: 0 0 3px }
+
+.upd-icon {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  margin-top: 1px;
+  fill: none;
+  stroke: var(--ok);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.upd-sub { margin: 0; font-size: 13px; color: var(--muted) }
+.upd-sub b { color: var(--fg); font-weight: 600 }
+
+/* Release notes: readable, scrollable, never pushing the buttons off-screen. */
+.upd-notes {
+  margin-top: 14px;
+  padding: 11px 13px;
+  max-height: 190px;
+  overflow-y: auto;
+  background: #12141b;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: #c8cdd9;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.upd-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 12px;
+  color: #8fa4ff;
+  font-size: 12.5px;
+  text-decoration: none;
+}
+.upd-link:hover { text-decoration: underline }
+.upd-link svg {
+  width: 12px; height: 12px; fill: none; stroke: currentColor;
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+
+.upd-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+.upd-bar {
+  flex: 1;
+  height: 5px;
+  background: #12141b;
+  border-radius: 99px;
+  overflow: hidden;
+}
+.upd-fill {
+  height: 100%;
+  width: 0;
+  background: var(--ok);
+  border-radius: 99px;
+  transition: width .18s ease-out;
+}
+.upd-pct {
+  font-size: 11.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 34px;
+  text-align: right;
+}

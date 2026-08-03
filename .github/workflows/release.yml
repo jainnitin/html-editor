@@ -75,10 +75,13 @@ jobs:
         with:
           tagName: ${{ env.RELEASE_TAG }}
           releaseName: HTML Editor ${{ env.RELEASE_TAG }}
+          # Prepended to GitHub's generated notes, which list the actual
+          # changes. The old fixed body told an existing user nothing about
+          # what they were being offered.
           releaseBody: |
-            HTML Editor desktop release.
-
-            Download the installer for your platform from the assets below. The app uses the signed updater manifest (`latest.json`) attached to this release for automatic updates.
+            Installed copies update themselves — open HTML Editor and it will offer this version.
+            First time here? Download the installer for your platform below.
+          generateReleaseNotes: true
           # Kept a draft until every platform has uploaded. GitHub never
           # resolves /releases/latest to a draft, so installed apps keep seeing
           # the previous complete release rather than a half-built one.
