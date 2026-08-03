@@ -35,6 +35,9 @@ for f in src/main.js src/lib/*.js; do
   check "syntax $(basename "$f")" "node --check '$f'"
 done
 
+step "Tests"
+check "node --test" "npm test"
+
 step "Rust"
 check "cargo fmt --check"        "cd src-tauri && cargo fmt --check"
 check "cargo clippy -D warnings" "cd src-tauri && cargo clippy --release -- -D warnings"

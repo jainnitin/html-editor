@@ -8,25 +8,26 @@
 
 import { doc, win } from './dom.js';
 import { S, markDirty } from './state.js';
-import { hasUndo, popUndo } from './history.js';
+import { undo as undoStep, redo as redoStep, pushNative } from './history.js';
 
 /** Commands with no meaningful on/off state to reflect in the toolbar. */
 const STATELESS = new Set(['undo', 'redo', 'unlink', 'removeFormat']);
 
-/** Drain our own undo entries first, then fall back to the browser's. */
-function undo() {
-  if (popUndo()) {
-    markDirty();
-    return;
-  }
-  doc()?.execCommand('undo', false, null);
-  markDirty();
-}
-
 export function exec(cmd) {
   const d = doc();
   if (!d || !S.editing) return;
-  if (cmd === 'undo') return undo();
+
+  // Undo and redo walk the shared timeline, which interleaves our own
+  // operations with the browser's.
+  if (cmd === 'undo' || cmd === 'redo') {
+    const moved = cmd === 'undo' ? undoStep(d) : redoStep(d);
+    if (moved) {
+      markDirty();
+      win()?.focus();
+      syncActive();
+    }
+    return;
+  }
 
   // Emit tags rather than inline styles, so output matches the report's CSS.
   try {
@@ -35,6 +36,7 @@ export function exec(cmd) {
     /* Not supported everywhere; the default is close enough. */
   }
   d.execCommand(cmd, false, null);
+  pushNative();
 
   markDirty();
   win()?.focus();
@@ -57,5 +59,3 @@ export function syncActive() {
     b.classList.toggle('active', on);
   }
 }
-
-export { hasUndo };

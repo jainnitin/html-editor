@@ -119,9 +119,16 @@ fn read_text_file(auth: State<Authorized>, path: String) -> Result<String, Strin
     fs::read_to_string(&path).map_err(|e| format!("{path}: {e}"))
 }
 
-/// Write the edited document back to disk. On the first save of a given file we
-/// stash the untouched original next to it, so a bad edit is always recoverable.
-/// Returns whether a backup was actually created.
+/// Write the edited document back to disk.
+///
+/// The first save of a file stashes the untouched original beside it as
+/// `<name>.bak`, so a bad edit is always recoverable. Exactly one backup is
+/// kept per file: an existing `.bak` is never overwritten, since the point is
+/// to preserve the state before *any* edit rather than before the last one.
+///
+/// Backing up a `.bak` is refused outright — those files are openable, and
+/// without this a round trip would leave `report.html.bak.bak` behind, then
+/// `.bak.bak.bak`.
 #[tauri::command]
 fn write_text_file(
     auth: State<Authorized>,
@@ -131,7 +138,10 @@ fn write_text_file(
 ) -> Result<bool, String> {
     auth.check(&path)?;
     let mut made = false;
-    if backup {
+    let is_backup = Path::new(&path)
+        .extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("bak"));
+    if backup && !is_backup {
         let bak = format!("{path}.bak");
         if Path::new(&path).exists() && !Path::new(&bak).exists() {
             fs::copy(&path, &bak).map_err(|e| format!("{bak}: {e}"))?;

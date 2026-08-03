@@ -14,7 +14,7 @@ import { S, appWindow, setTitle, setSaveState, markClean, onDirty } from './stat
 import { resetMode } from './modes.js';
 import { closeFind } from './find.js';
 import { serialize } from './viewport.js';
-import { clearUndo } from './history.js';
+import { clearHistory } from './history.js';
 import { track, trackError, bucket, shutdown } from './telemetry.js';
 
 const AUTOSAVE_DELAY = 1200;
@@ -53,7 +53,7 @@ function applyDocument(path, html) {
   S.sourceHtml = html;
   S.dirty = false;
   S.warnedGenerated = false;
-  clearUndo();
+  clearHistory();
 
   resetMode();
   closeFind();

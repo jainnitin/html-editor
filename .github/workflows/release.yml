@@ -66,6 +66,10 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Telemetry is compiled in only for released builds; a source build
+          # with these unset reports nothing.
+          VITE_AI_INGEST: ${{ secrets.VITE_AI_INGEST }}
+          VITE_AI_IKEY: ${{ secrets.VITE_AI_IKEY }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:

@@ -7,7 +7,7 @@
 
 import { $, doc, win, toast } from './dom.js';
 import { S, markDirty } from './state.js';
-import { pushUndo } from './history.js';
+import { pushCustom } from './history.js';
 import { track, bucket } from './telemetry.js';
 
 /** Text inside these elements is code or markup, never prose. */
@@ -119,8 +119,12 @@ export function replaceAll() {
     return;
   }
 
-  // One undo entry for the whole sweep.
-  pushUndo(() => touched.forEach(([node, old]) => { node.nodeValue = old; }));
+  // One timeline entry for the whole sweep, in both directions.
+  const after = touched.map(([node]) => node.nodeValue);
+  pushCustom(
+    () => touched.forEach(([node, old]) => { node.nodeValue = old; }),
+    () => touched.forEach(([node], i) => { node.nodeValue = after[i]; })
+  );
   markDirty();
   refreshCount();
   track('replace_all', { count: bucket(n) });

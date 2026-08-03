@@ -28,6 +28,7 @@ import {
 } from './lib/modes.js';
 import { onDocMove, clearHover, trimBlock } from './lib/trim.js';
 import { exec, syncActive } from './lib/format.js';
+import { pushNative, isReplaying } from './lib/history.js';
 import { openFind, closeFind, isFindOpen, bindFind } from './lib/find.js';
 import { linkFromSelection, openLinkDialog, showAudit, bindLinks } from './lib/links.js';
 import * as telemetry from './lib/telemetry.js';
@@ -63,6 +64,9 @@ frame.addEventListener('load', () => {
 });
 
 function onInput() {
+  // Typing lands on the browser's own undo stack; record its place in the
+  // shared timeline so our operations and the browser's stay in order.
+  if (!isReplaying()) pushNative();
   markDirty();
   const sel = frame.contentWindow?.getSelection();
   const node = sel?.anchorNode;
@@ -151,7 +155,10 @@ function onKeydown(e) {
     d: toggleTrim,
     s: () => (shift ? doSaveAs() : doSave()),
     k: () => S.editing && linkFromSelection(),
-    l: () => shift && showAudit()
+    l: () => shift && showAudit(),
+    // Windows' other redo binding. ⌘Z / ⇧⌘Z arrive through the menu
+    // accelerators, which claim those keys; Ctrl+Y is claimed by nothing.
+    y: () => exec('redo')
   }[k];
 
   if (!handler) return;

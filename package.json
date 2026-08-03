@@ -1,13 +1,14 @@
 {
   "name": "html-editor",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "tauri": "tauri",
-    "preflight": "bash scripts/preflight.sh"
+    "preflight": "bash scripts/preflight.sh",
+    "test": "node --test test/*.test.mjs"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",

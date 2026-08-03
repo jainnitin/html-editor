@@ -7,7 +7,7 @@
 
 import { doc, toast } from './dom.js';
 import { S, markDirty } from './state.js';
-import { pushUndo } from './history.js';
+import { pushCustom } from './history.js';
 import { track } from './telemetry.js';
 
 /**
@@ -77,7 +77,10 @@ export function trimBlock(goUp) {
 
   const parent = el.parentNode;
   const next = el.nextSibling;
-  pushUndo(() => parent.insertBefore(el, next));
+  pushCustom(
+    () => parent.insertBefore(el, next),
+    () => el.remove()
+  );
   el.remove();
 
   markDirty();
