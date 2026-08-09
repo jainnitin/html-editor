@@ -109,6 +109,26 @@ jobs:
           includeUpdaterJson: true
           args: ${{ matrix.args }}
 
+      # tauri-action notarizes the .app but not the .dmg wrapper, so a freshly
+      # downloaded dmg would warn on open. Notarize + staple the dmg itself and
+      # replace the uploaded asset so opening the installer is clean too.
+      - name: Notarize and staple the macOS DMG
+        if: runner.os == 'macOS'
+        env:
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          DMG=$(ls src-tauri/target/*/release/bundle/dmg/*.dmg | head -1)
+          echo "Notarizing $DMG"
+          xcrun notarytool submit "$DMG" \
+            --key "$RUNNER_TEMP/apple_api_key.p8" \
+            --key-id "$APPLE_API_KEY" --issuer "$APPLE_API_ISSUER" --wait
+          xcrun stapler staple "$DMG"
+          xcrun stapler validate "$DMG"
+          gh release upload "$RELEASE_TAG" "$DMG" --clobber --repo "$GITHUB_REPOSITORY"
+
   publish:
     name: Publish release
     needs: build
