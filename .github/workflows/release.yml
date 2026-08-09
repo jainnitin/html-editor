@@ -62,6 +62,15 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      # Materialise the App Store Connect API key (.p8) so Tauri can notarize
+      # with it. Only the macOS runners need it; the file lands in RUNNER_TEMP,
+      # which is wiped when the job ends.
+      - name: Write Apple API key
+        if: runner.os == 'macOS'
+        env:
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+        run: printf '%s' "$APPLE_API_KEY_P8" > "$RUNNER_TEMP/apple_api_key.p8"
+
       - name: Build and publish Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -72,16 +81,26 @@ jobs:
           VITE_AI_IKEY: ${{ secrets.VITE_AI_IKEY }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Apple Developer ID signing + notarization (macOS runners only; these
+          # are simply unused on the Windows runner). tauri-action imports
+          # APPLE_CERTIFICATE into a temporary keychain, signs the .app/.dmg with
+          # a hardened runtime and secure timestamp, then notarizes with the App
+          # Store Connect API key and staples the ticket.
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_PATH: ${{ runner.temp }}/apple_api_key.p8
         with:
           tagName: ${{ env.RELEASE_TAG }}
           releaseName: HTML Editor ${{ env.RELEASE_TAG }}
-          # Prepended to GitHub's generated notes, which list the actual
-          # changes. The old fixed body told an existing user nothing about
-          # what they were being offered.
+          # The release notes are exactly this short, friendly message — no
+          # auto-generated list of internal commits.
           releaseBody: |
             Installed copies update themselves — open HTML Editor and it will offer this version.
             First time here? Download the installer for your platform below.
-          generateReleaseNotes: true
+          generateReleaseNotes: false
           # Kept a draft until every platform has uploaded. GitHub never
           # resolves /releases/latest to a draft, so installed apps keep seeing
           # the previous complete release rather than a half-built one.

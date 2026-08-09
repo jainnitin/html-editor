@@ -15,12 +15,6 @@ macOS and Windows. Built with Tauri 2 and Vite, no frontend framework.
 Grab the latest build from [Releases](https://github.com/jainnitin/html-editor/releases):
 `.dmg` for macOS, `-setup.exe` for Windows. After that the app updates itself.
 
-The app is unsigned, so macOS quarantines it on first launch. Clear that once:
-
-```bash
-xattr -dr com.apple.quarantine "/Applications/HTML Editor.app"
-```
-
 ## Using it
 
 A file opens **ready to edit** — click into the page and type. Auto-save writes

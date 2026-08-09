@@ -59,10 +59,16 @@ partial update — fix the failing platform and re-run.
 
 The workflow builds and publishes one GitHub Release containing the macOS Apple Silicon bundle, macOS Intel bundle, Windows x64 bundle, and the signed `latest.json` updater manifest consumed by `tauri-plugin-updater`.
 
-Users should download the installer for their platform from the GitHub Release assets. Because builds are unsigned, macOS users may need to remove quarantine for the first manual install, for example:
+Users download the installer for their platform from the GitHub Release assets. macOS builds are signed with a Developer ID and notarized by Apple, so they open normally with no quarantine workaround. Windows builds are unsigned and may still show a SmartScreen warning.
 
-```sh
-xattr -dr com.apple.quarantine "/Applications/HTML Editor.app"
-```
+### macOS signing secrets
 
-Auto-updates after that initial install are signed with the updater key and are not affected by Gatekeeper quarantine in the same way. Windows users may still see unsigned-app warnings.
+The macOS jobs sign and notarize automatically when these repository secrets are present (absent them, the build still succeeds, just unsigned):
+
+| Secret | What it is |
+| --- | --- |
+| `APPLE_CERTIFICATE` | base64 of the Developer ID Application cert as a `.p12` |
+| `APPLE_CERTIFICATE_PASSWORD` | the `.p12` export password |
+| `APPLE_SIGNING_IDENTITY` | e.g. `Developer ID Application: Your Name (TEAMID)` |
+| `APPLE_API_ISSUER` / `APPLE_API_KEY` | App Store Connect API key issuer ID + key ID |
+| `APPLE_API_KEY_P8` | the raw contents of the API key `.p8` file |
