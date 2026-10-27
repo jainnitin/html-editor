@@ -22,6 +22,15 @@ shortly after you stop typing, when the window loses focus, and on close, so
 `⌘S` is never something to remember. The first save of any file keeps the
 untouched original as `<name>.html.bak`, and everything is undoable.
 
+For a web editor such as a WordPress Custom HTML block, copy the **source HTML**
+from its code field, choose **Paste HTML**, and paste it into the dialog. Edit
+the rendered draft, then choose **Copy HTML** (`⇧⌘C`) to paste the source back.
+A pasted block is copied back as a block; a complete HTML page is copied as a
+complete page. Clipboard drafts stay unsaved until you choose Save or Save As.
+The app asks before discarding an unsaved draft.
+Use the mode menu to switch to **HTML source** when you want to inspect or edit
+the markup directly. Switching back to Editing renders your source changes.
+
 Four things earn their place in the toolbar:
 
 - **Links** — click any link while editing to change its text or URL.
@@ -44,9 +53,10 @@ reports ship a tuned design system, and highlight colours or font sizes would
 only leave `<font>` tags and inline styles fighting the existing stylesheet.
 Anything more is better fixed by deleting the block and regenerating it.
 
-Everything else lives in the menu bar: **File** (open, recents, save as, save a
-copy, auto-save, reveal), **Edit** (undo, find), **Format**, and **Tools**
-(Editing `⌘E` / Viewing `⇧⌘E`, Trim `⌘D`, Link audit `⇧⌘L`).
+Everything else lives in the menu bar: **File** (open, new from pasted HTML,
+recents, save as, save a copy, auto-save, reveal), **Edit** (undo, copy HTML,
+find), **Format**, and **Tools**
+(Editing `⌘E` / Viewing `⇧⌘E` / HTML Source, Trim `⌘D`, Link audit `⇧⌘L`).
 
 ## Build from source
 

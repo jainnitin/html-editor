@@ -5,10 +5,14 @@
 
 import { $, win, toast } from './dom.js';
 import { S } from './state.js';
-import { applyModes } from './viewport.js';
+import { applyModes, serialize } from './viewport.js';
+import { isHtmlFragment } from './html-kind.js';
+import { clearHistory } from './history.js';
+import { closeFind } from './find.js';
 import { track } from './telemetry.js';
 
-const MODE_LABEL = { edit: 'Editing', view: 'Viewing' };
+const MODE_LABEL = { edit: 'Editing', view: 'Viewing', source: 'HTML source' };
+const hasDocument = () => Boolean(S.filePath || S.clipboardDraft);
 
 /** Mirror the current mode onto the toolbar. */
 export function syncButtons() {
@@ -27,16 +31,35 @@ export function syncButtons() {
 
 export function setMode(next) {
   closeModeMenu();
-  if (!S.filePath || next === S.mode) return;
+  if (!hasDocument() || next === S.mode) return;
+
+  if (next === 'source') {
+    const html = serialize();
+    $('source').value = html;
+    S.sourceSnapshot = html;
+    closeFind();
+  } else if (S.mode === 'source') {
+    const html = $('source').value;
+    if (html !== S.sourceSnapshot) {
+      S.sourceHtml = html;
+      S.fragment = isHtmlFragment(html);
+      clearHistory();
+      $('frame').srcdoc = html;
+    }
+  }
 
   S.mode = next;
   S.editing = next === 'edit';
   if (!S.editing) S.trimming = false;
 
+  $('source').hidden = next !== 'source';
+  $('frame').hidden = next === 'source';
+
   syncButtons();
   applyModes();
   track('mode_changed', { mode: next });
   if (S.editing) win()?.focus();
+  else if (next === 'source') $('source').focus();
 }
 
 export const toggleEdit = () => setMode(S.editing ? 'view' : 'edit');
@@ -46,6 +69,10 @@ export function resetMode() {
   S.mode = 'edit';
   S.editing = true;
   S.trimming = false;
+  S.sourceSnapshot = '';
+  $('source').value = '';
+  $('source').hidden = true;
+  $('frame').hidden = false;
   syncButtons();
 }
 
@@ -54,11 +81,8 @@ export function resetMode() {
  * rather than appearing in the pulldown, and it pulls you into Editing.
  */
 export function toggleTrim() {
-  if (!S.filePath) return;
-  if (!S.editing) {
-    S.mode = 'edit';
-    S.editing = true;
-  }
+  if (!hasDocument()) return;
+  if (!S.editing) setMode('edit');
   S.trimming = !S.trimming;
   syncButtons();
   applyModes();
@@ -78,7 +102,7 @@ export function closeModeMenu() {
 }
 
 export function toggleModeMenu() {
-  if (!S.filePath) return;
+  if (!hasDocument()) return;
   const open = isModeMenuOpen();
   $('modemenu').hidden = open;
   $('modebtn').setAttribute('aria-expanded', String(!open));

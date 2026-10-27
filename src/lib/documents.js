@@ -15,6 +15,7 @@ import { resetMode } from './modes.js';
 import { closeFind } from './find.js';
 import { serialize } from './viewport.js';
 import { clearHistory } from './history.js';
+import { isHtmlFragment } from './html-kind.js';
 import { track, trackError, bucket, shutdown, docId } from './telemetry.js';
 
 const AUTOSAVE_DELAY = 1200;
@@ -49,9 +50,12 @@ export async function loadPath(path) {
 }
 
 function applyDocument(path, html) {
+  clearTimeout(saveTimer);
   S.filePath = path;
+  S.clipboardDraft = !path;
+  S.fragment = isHtmlFragment(html);
   S.sourceHtml = html;
-  S.dirty = false;
+  S.dirty = !path;
   S.warnedGenerated = false;
   clearHistory();
 
@@ -62,10 +66,14 @@ function applyDocument(path, html) {
 
   setTitle();
   setSaveState();
-  invoke('push_recent', { path }).catch(() => {});
+  if (path) invoke('push_recent', { path }).catch(() => {});
 
   S.edits = 0;
   S.docId = '';
+  if (!path) {
+    track('clipboard_draft_opened', { size: bucket(html.length) });
+    return;
+  }
   docId(path).then((id) => {
     S.docId = id;
     track('file_opened', {
@@ -74,6 +82,49 @@ function applyDocument(path, html) {
       has_scripts: String(/<script[\s>]/i.test(html))
     });
   });
+}
+
+export async function newFromPastedHtml(html) {
+  if (!html.trim()) {
+    toast('Paste some HTML first.');
+    return false;
+  }
+  if (!(await confirmDiscard())) return false;
+  applyDocument(null, html);
+  return true;
+}
+
+export async function copyHtml() {
+  if (!S.filePath && !S.clipboardDraft) {
+    toast('No HTML to copy.');
+    return;
+  }
+  const html = serialize();
+  try {
+    await navigator.clipboard.writeText(html);
+  } catch {
+    // WebKit may reject the async clipboard API from a native menu event.
+    const field = document.createElement('textarea');
+    field.value = html;
+    field.style.cssText = 'position:fixed;left:-9999px;top:0';
+    document.body.appendChild(field);
+    let copied = false;
+    const active = document.activeElement;
+    try {
+      field.select();
+      copied = document.execCommand('copy');
+    } catch {
+      copied = false;
+    } finally {
+      field.remove();
+      active?.focus();
+    }
+    if (!copied) {
+      await fail('Could not copy HTML.', 'Use the Copy HTML button or try again.');
+      return;
+    }
+  }
+  toast(S.fragment ? 'HTML block copied.' : 'HTML document copied.');
 }
 
 /* ---------------- saving ---------------- */
@@ -92,7 +143,11 @@ export async function flushSave() {
 }
 
 export async function doSave(auto) {
-  if (!S.filePath || S.saving) return;
+  if (!S.filePath) {
+    if (S.clipboardDraft && !auto) await doSaveAs();
+    return;
+  }
+  if (S.saving) return;
   clearTimeout(saveTimer);
 
   // The very first write of a file stashes the pristine original beside it.
@@ -123,7 +178,7 @@ export async function doSave(auto) {
 }
 
 async function pickTarget(kind) {
-  const base = baseName(S.filePath).replace(/\.bak$/i, '').replace(/\.html?$/i, '');
+  const base = (S.filePath ? baseName(S.filePath) : 'pasted-html').replace(/\.bak$/i, '').replace(/\.html?$/i, '');
   const suggested = kind === 'copy' ? `${base} copy.html` : `${base}.html`;
   try {
     return await invoke('pick_save_path', { suggested });
@@ -133,10 +188,11 @@ async function pickTarget(kind) {
 }
 
 export async function doSaveAs() {
-  if (!S.filePath) return;
+  if (!S.filePath && !S.clipboardDraft) return;
   const picked = await pickTarget();
   if (!picked) return;
   S.filePath = picked;
+  S.clipboardDraft = false;
   S.backedUp.add(picked);
   await doSave();
   invoke('push_recent', { path: picked }).catch(() => {});
@@ -203,11 +259,11 @@ export function revealInFinder() {
 /** With auto-save on there is nothing to discard, so this just commits. */
 export async function confirmDiscard() {
   if (!S.dirty) return true;
-  if (S.autosave) {
+  if (S.autosave && S.filePath) {
     await flushSave();
     return true;
   }
-  return ask('You have unsaved changes. Discard them?', {
+  return ask(S.clipboardDraft ? 'Discard this pasted HTML draft?' : 'You have unsaved changes. Discard them?', {
     title: 'Unsaved changes',
     kind: 'warning',
     okLabel: 'Discard',
@@ -219,7 +275,7 @@ export function bindLifecycle() {
   appWindow.onCloseRequested(async (event) => {
     event.preventDefault();
     if (S.dirty) {
-      if (S.autosave) await flushSave();
+      if (S.autosave && S.filePath) await flushSave();
       else if (!(await confirmDiscard())) return;
     }
     await shutdown();

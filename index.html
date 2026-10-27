@@ -44,6 +44,10 @@
     <svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01" class="dots"/></svg>
   </button>
 
+  <span class="sep"></span>
+  <button class="tb wide" id="pastehtml" title="Create a draft from pasted HTML">Paste HTML</button>
+  <button class="tb wide" id="copyhtml" title="Copy the edited HTML">Copy HTML</button>
+
   <span class="grow"></span>
   <span id="savestate"></span>
 
@@ -62,6 +66,11 @@
       <button data-mode="view" role="menuitemradio">
         <svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
         <span><b>Viewing</b><small>Read-only, links clickable</small></span>
+        <span class="tick">✓</span>
+      </button>
+      <button data-mode="source" role="menuitemradio">
+        <svg viewBox="0 0 24 24"><path d="m8 6-6 6 6 6M16 6l6 6-6 6M14 4l-4 16"/></svg>
+        <span><b>HTML source</b><small>View and edit the markup</small></span>
         <span class="tick">✓</span>
       </button>
     </div>
@@ -97,9 +106,10 @@
 
 <div id="stage">
   <iframe id="frame"></iframe>
+  <textarea id="source" aria-label="HTML source" spellcheck="false" hidden></textarea>
   <div id="drop">
     <h2>Drop an .html file here</h2>
-    <p>…or use <b>File ▸ Open…</b><br>
+    <p>…or use <b>File ▸ Open…</b> or <b>Paste HTML</b><br>
 Opens ready to edit — just click into the page and type.<br>
     Click any link while editing to change its text or URL.</p>
     <p class="keys"><kbd>⌘O</kbd> open &nbsp; <kbd>⌘S</kbd> save &nbsp;
@@ -109,6 +119,17 @@ Opens ready to edit — just click into the page and type.<br>
 </div>
 
 <div id="toast" hidden></div>
+
+<dialog id="pastedlg">
+  <h3>New from pasted HTML</h3>
+  <p>Paste the HTML you want to edit.</p>
+  <textarea id="pasteinput" aria-label="HTML source" placeholder="Paste HTML here" spellcheck="false"></textarea>
+  <div class="row">
+    <span class="grow"></span>
+    <button id="pastecancel">Cancel</button>
+    <button id="pastecreate" class="primary">Create draft</button>
+  </div>
+</dialog>
 
 <dialog id="linkdlg">
   <h3 id="linktitle">Edit link</h3>

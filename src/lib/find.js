@@ -132,7 +132,11 @@ export function replaceAll() {
 }
 
 export function openFind() {
-  if (!S.filePath) return;
+  if (!S.filePath && !S.clipboardDraft) return;
+  if (S.mode === 'source') {
+    toast('Switch to Editing or Viewing to find in the page.');
+    return;
+  }
   track('find_opened');
   $('findbar').hidden = false;
   $('fq').focus();

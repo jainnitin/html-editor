@@ -3,7 +3,7 @@
  * the report draws for itself.
  */
 
-import { doc, toast } from './dom.js';
+import { $, doc, toast } from './dom.js';
 import { S } from './state.js';
 import { clearHover } from './trim.js';
 import { track, bucket } from './telemetry.js';
@@ -113,6 +113,7 @@ export function warnIfGenerated(el) {
  * affordance the editor added.
  */
 export function serialize() {
+  if (S.mode === 'source') return $('source').value;
   const d = doc();
   const root = d.documentElement.cloneNode(true);
 
@@ -133,5 +134,12 @@ export function serialize() {
     root.querySelector('.tabs')?.setAttribute('hidden', '');
   }
 
+  if (S.fragment) {
+    // The HTML parser moves leading <link> and <style> tags into <head>, even
+    // when they came from a pasted block. Keep them when exporting the block.
+    const head = root.querySelector('head').innerHTML;
+    const body = root.querySelector('body').innerHTML;
+    return head + body;
+  }
   return `<!doctype html>\n${root.outerHTML}\n`;
 }
